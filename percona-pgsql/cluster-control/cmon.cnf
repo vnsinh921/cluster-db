@@ -1,0 +1,20 @@
+#
+# Configuration file for the Cmon Controller.
+#
+
+#
+# The name or IP address of the Cmon Controller.
+#
+hostname=cluster-control
+
+#
+# Cmon Database credentials. The controller will use 
+# this database to store its own data structures.
+#
+mysql_hostname=127.0.0.1
+mysql_port=3306
+mysql_password='1'
+cmon_user=cmon
+cmon_db=cmon
+rpc_key=f42ad8cd546ee9278f8abc0e70c819b411dfe232
+controller_id=f6af49f6-49cc-44fc-80c2-9a813eb2a358
