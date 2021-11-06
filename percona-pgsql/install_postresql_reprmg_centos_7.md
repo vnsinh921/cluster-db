@@ -3,7 +3,12 @@ Mô hình:
 10.0.0.11 Node-1 master (Centos 7)  
 10.0.0.12 Node-2 slave-1 (Centos 7)  
 10.0.0.13 Node-3 slave-2 (Centos 7)  
-10.0.0.14 Haproxy (Ubuntu-20.04)  
+10.0.0.14 Haproxy-1 (Ubuntu-20.04)  
+10.0.0.13 Haproxy-2 (Ubuntu-20.04)  
+10.0.0.10 VIP-HA
+<img src="./images/so do.png" />
+
+
 1. Chuẩn bị môi trường
 - Trên tất cả các node cài đặt postgresql
 # Sửa file /etc/hosts
@@ -290,7 +295,7 @@ Thêm các dòng sau vào cuối file:
     # The purpose of this script is make haproxy capable of monitoring PostgreSQL properly
     #
 
-    export PGHOST='10.0.0.13' # Doi IP cua tung node
+    export PGHOST='10.0.0.11' # Doi IP cua tung node
     export PGUSER='repmgr'
     export PGPASSWORD='1'
     export PGPORT='5432'
