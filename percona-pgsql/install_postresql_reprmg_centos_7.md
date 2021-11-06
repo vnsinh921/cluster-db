@@ -70,7 +70,7 @@ sửa các tham số sau trên file: /var/lib/pgsql/9.6/data/postgresql.conf
         wal_level = replica  
         wal_log_hints = on  
         archive_mode = on
-        archive_command = '/var/lib/pgsql/9.6/archives'  
+        archive_command = 'cp %p /var/lib/pgsql/9.6/archives/%f'  
         max_wal_senders = 3  
         max_replication_slots = 2  
         hot_standby = on   
