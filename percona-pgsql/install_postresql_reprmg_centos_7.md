@@ -282,7 +282,7 @@ Thêm các dòng sau vào cuối file:
     }
     EOF
 # Add service check port postgres
-        
+    echo "postgreschk        9201/tcp" >> /etc/servicesss
 # Tạo script check service postgres
     touch /usr/local/sbin/postgreschk
     chmod +x /usr/local/sbin/postgreschk
