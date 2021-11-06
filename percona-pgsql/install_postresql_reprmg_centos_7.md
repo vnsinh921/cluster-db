@@ -6,7 +6,7 @@ Mô hình:
 10.0.0.14 Haproxy-1 (Ubuntu-20.04)  
 10.0.0.13 Haproxy-2 (Ubuntu-20.04)  
 10.0.0.10 VIP-HA
-<img src="./images/so do.png" />
+<img src="./images/mohinh.png" />
 
 
 1. Chuẩn bị môi trường
