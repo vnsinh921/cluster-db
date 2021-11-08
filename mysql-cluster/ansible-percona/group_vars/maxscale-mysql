@@ -1,0 +1,17 @@
+# Maxscale config
+sql_read_only_servers: 
+  - name: mysql-node-1
+    address: 10.0.0.11
+    port: 3306
+
+  - name: mysql-node-2
+    address: 10.0.0.12
+    port: 3306
+
+  - name: mysql-node-3
+    address: 10.0.0.13
+    port: 3306  
+
+
+maxscale_db_user_name: maxscaleuser
+maxscale_db_user_password: 0atvL0nqgmFVHpD3

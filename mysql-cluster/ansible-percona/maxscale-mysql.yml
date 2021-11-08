@@ -1,0 +1,4 @@
+- hosts: maxscale-mysql
+  become: yes
+  roles:
+    - {role: maxscale, tags: maxscale}
