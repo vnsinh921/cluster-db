@@ -71,7 +71,10 @@ Bài hướng dẫn dưới đây tôi sẽ cấu hình cho nó hoạt động �
     node-1: 10.0.0.11
     node-2: 10.0.0.12
     node-3: 10.0.0.13
-<img src="./images/cau-hinh-Percona-Xtradb-Cluster-8.0-tren-Centos-7-1.png" />
+
+<a name="2.3"></a>
+### 2.3. Mô hình
+<img src="./images/cau-hinh-Percona-Xtradb-Cluster-8.0-tren-Centos-7-1.png" style="display: block; margin: auto;" width="1000" />
 
 <a name="3.1"></a>
 ### Bước 1: Thực hiện cài đặt các packge all node
