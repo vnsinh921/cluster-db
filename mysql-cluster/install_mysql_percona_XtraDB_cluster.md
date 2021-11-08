@@ -1,8 +1,9 @@
-# Mồ hình 3 node cài đặt mysql master-mast băng percona-xtradb-cluster
+# Mồ hình 3 node cài đặt mysql master-master bằng percona-xtradb-cluster
     node-1: 10.0.0.11
     node-2: 10.0.0.12
     node-3: 10.0.0.13
 <img src="./images/cau-hinh-Percona-Xtradb-Cluster-8.0-tren-Centos-7-1.png" />
+
 # Thực hiện cài đặt các packge all node
     apt update -y
     apt remove apparmor -y # Remove apparmor
