@@ -1,0 +1,57 @@
+[mysqld]
+datadir = /var/lib/mysql
+user = mysql
+default-time-zone = '+7:00'
+max_connections = {{max_connections}}
+#bind-address = {{my_ip}}
+slow-query-log = /var/log/mysql/mysql-slow.log
+long_query_time = 2
+
+# UTF8
+default-storage-engine = innodb
+innodb_file_per_table = on
+collation-server = utf8_general_ci
+init-connect = 'SET NAMES utf8'
+character-set-server = utf8
+default-storage-engine = innodb
+innodb_file_per_table = on
+init-connect = 'SET NAMES utf8mb4'
+character-set-client-handshake = FALSE
+character-set-server = utf8mb4
+collation-server = utf8mb4_unicode_ci
+innodb_buffer_pool_size = 9G
+innodb_buffer_pool_instances = 4
+innodb_log_file_size = 256M
+innodb_flush_log_at_trx_commit = 2
+innodb_flush_method = O_DIRECT
+innodb_lru_scan_depth = 256
+innodb_io_capacity = 500
+innodb_io_capacity_max = 2000
+innodb_thread_concurrency = 0
+innodb_read_io_threads = 6
+innodb_write_io_threads = 6
+show_compatibility_56 = ON;
+max_allowed_packet = 1024M
+innodb_autoinc_lock_mode = 2
+pxc_strict_mode = DISABLED
+
+# Path to Galera library
+wsrep_provider = /usr/lib/galera3/libgalera_smm.so
+# Cluster connection URL contains IPs of node#1, node#2 and node#3
+wsrep_cluster_address = gcomm://{% for ip in wsrep.cluster_address %}{{ip}},{% endfor %}
+
+
+# In order for Galera to work correctly binlog format should be ROW
+binlog_format = ROW
+# MyISAM storage engine has only experimental support
+default_storage_engine = InnoDB
+# This changes how InnoDB autoincrement locks are managed and is a requirement for Galera
+innodb_autoinc_lock_mode = 2
+# Node #2 address
+wsrep_node_address = {{my_ip}}
+# Cluster name
+wsrep_cluster_name = {{wsrep.cluster_name}}
+# SST method
+wsrep_sst_method = xtrabackup-v2
+#Authentication for SST method
+wsrep_sst_auth = "{{sst.user}}:{{sst.pass}}"

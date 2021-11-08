@@ -1,0 +1,4 @@
+- hosts: mysql-percona
+  become: yes
+  roles:
+    - {role: percona, tags: percona}

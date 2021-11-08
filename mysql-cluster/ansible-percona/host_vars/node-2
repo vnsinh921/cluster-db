@@ -1,0 +1,3 @@
+my_ip: 10.0.0.12
+is_master: False
+mysql_bootstrap: "{{is_master}}"
