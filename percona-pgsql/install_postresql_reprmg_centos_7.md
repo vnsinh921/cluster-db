@@ -1,31 +1,98 @@
-Hướng dẫn cài đặt postgresql Auto Failover Repmgr  
-Mô hình:  
-10.0.0.11 Node-1 master (Centos 7)  
-10.0.0.12 Node-2 slave-1 (Centos 7)  
-10.0.0.13 Node-3 slave-2 (Centos 7)  
-10.0.0.14 Haproxy-1 (Ubuntu-20.04)  
-10.0.0.13 Haproxy-2 (Ubuntu-20.04)  
-10.0.0.10 VIP-HA
+***Hướng dẫn cài đặt postgresql Auto Failover Repmgr ***  
+### Menu
+[1. Mô hình](#1)  
+[2. Chuẩn bị ](#2)
+- [2.1 Chuẩn bị môi trường](#2.1)
+- [2.2 Thiết lập IP cho các node](#2.2)
+- [2.3 Thiết lập hostname và sửa file /etc/hosts](#2.3) 
+[3. Cài đặt postgresql](#3)
+- [3.1 Cài đặt postgresql all node](#3.1)
+- [3.2 Tạo  file .bashrc all node](#3.2)
+- [3.2 Tao file .bash_profile all node](#3.3) 
+- [3.4 Tạo thư mục lưu log cho postgres](#3.4) 
+[4. Config master node](#4)
+- [4.1 Khởi tạo data trên node master](#4.1)
+- [4.2 Config postgresql trên master node](#4.2)
+- [4.3 Config repmgr master node](#4.3)
+- [4.4 Start service postgresql](#4.4)
+- [4.5 Register the primary server](#4.5)
+[5. Config node slave-1](#5)
+- [5.1 Config repmgr node slave-1](#5.1)
+- [5.2 Clone and register standby database to master](#5.2)
+[6. Config node slave-1](#6)
+- [6.1 Config repmgr node slave-1](#6.1)
+- [6.2 Clone and register standby database to master](#6.2)
+[7. Demo High Availability switch master](#7)
+- [7.1 Manual](#7.1)
+    - [Bước 1: shutdown node-1 check cluster trên node-2 và node-3](#7.1.1)  
+    - [Bước 2: promote node-2 lên thành node master](#7.1.2)  
+    - [Bước 3 : Đúng trên node-2 và node-3 check status cluster](#7.1.3)  
+    - [Bước 4: Set node-3 follow standby node-2](#7.1.4)  
+    - [Bước 5: Check lại trạng thái cluster](#7.1.5)  
+    - [Bước 6: Check lại trạng thái cluster](#7.1.6)  
+    - [Bước 7: Rejoin cluster](#7.1.7)  
+- [7.2 Auto switch master](#7.2)
+    - [Bước 1: Kiểm tra trạng thái cluster và repmgr service](#7.2.1)  
+    - [Bước 2: Start repmgr-96 trên tất cả các node](#7.2.2) 
+    - [Bước 3: Check status repmgr ](#7.2.3)  
+    - [Bước 4: Check trạng thái cluster: master: node-1, standby: node-2, node-3](#7.2.4) 
+    - [Bước 5: Stop service postgresql-9.6 trên service node-1, check status cluster](#7.2.5)  
+    - [Bước 6: Stop service postgresql-9.6 trên service node-2, check status cluster](#7.2.6) 
+    - [Bước 7: Start lại server node-1, node-2 và join lại vào cluster](#7.2.7)  
+[8. Install Haproxy loadblance](#8)
+- [8.1 Install & Config trên các node-pg](#8.1)
+- [8.2 Config haproxy](#8.2)
+- [8.3 Check trạng thái backend trên UI](#8.3)
 
+<a name="1"></a>
+### 1. Mô hình
+<img src="./images/mohinh.png" style="display: block; margin: auto;" />
 
+<a name="2"></a>
+### 2. Chuẩn bị 
+<a name="2.1"></a>
+### 2.1. Chuẩn bị môi trường
+    [root@localhost ~]# cat /etc/os-release
+    NAME="CentOS Linux"
+    VERSION="7 (Core)"
+    ID="centos"
+    ID_LIKE="rhel fedora"
+    VERSION_ID="7"
+    PRETTY_NAME="CentOS Linux 7 (Core)"
+    ANSI_COLOR="0;31"
+    CPE_NAME="cpe:/o:centos:centos:7"
+    HOME_URL="https://www.centos.org/"
+    BUG_REPORT_URL="https://bugs.centos.org/"
 
-<img src="./images/mohinh.png" />
+    CENTOS_MANTISBT_PROJECT="CentOS-7"
+    CENTOS_MANTISBT_PROJECT_VERSION="7"
+    REDHAT_SUPPORT_PRODUCT="centos"
+    REDHAT_SUPPORT_PRODUCT_VERSION="7"
+<a name="2.2"></a>
+### 2.2 Thiết lập IP cho các node
+    node-1: 10.0.0.11
+    node-2: 10.0.0.12
+    node-3: 10.0.0.13
 
-
-1. Chuẩn bị môi trường
-- Trên tất cả các node cài đặt postgresql
-# Sửa file /etc/hosts
-
+<a name="2.3"></a>
+# 2.3 Thiết lập hostname và sửa file /etc/hosts
     cat <<EOF>> /etc/hosts
     10.0.0.11 node-1
     10.0.0.12 node-2
     10.0.0.13 node-3
     EOF
-# Cài đặt postgresql trên tất cả các node
+
+<a name="3"> </a>
+### 3. Cài đặt postgresql
+<a name="3.1"> </a>
+### 3.1 Cài đặt postgresql all node
     yum install https://download.postgresql.org/pub/repos/yum/reporpms/EL-7-x86_64/pgdg-redhat-repo-latest.noarch.rpm -y
     yum install postgresql96 postgresql96-server postgresql96-contrib postgresql96-libs repmgr96 xinetd -y
     ln -s /usr/pgsql-9.6/bin/repmgr /usr/bin/
-# Tao file .bashrc trên tất cả các node
+    ln -s /usr/pgsql-9.6/bin/pg_ctl /usr/bin/
+
+<a name="3.2"> </a>
+### 3.2 Tạo  file .bashrc all node
     su postgres && cd 
     touch .bashrc 
     cat <<EOF >> .bashrc 
@@ -40,7 +107,8 @@ Mô hình:
     fi
     source ~/.bash_profile
     EOF
-# Tao file .bash_profile trên tất cả các node
+<a name="3.3"> </a>
+### 3.2 Tao file .bash_profile all node
     su postgres && cd 
     touch .bash_profile 
     cat <<EOF >> .bash_profile
@@ -57,13 +125,19 @@ Mô hình:
     alias scp='scp -o StrictHostKeyChecking=no'
     alias rsync='rsync -e "ssh -o StrictHostKeyChecking=no"'
     EOF
-# Tao thu muc luu log cho postgres
+<a name="3.4"> </a>
+### 3.4 Tạo thư mục lưu log cho postgres
     mkdir /var/log/postgresql
     chown -R postgres:postgres /var/log/postgresql
-# Trên node master
+
+<a name="4"> </a>
+### 4. Config master node
+<a name="4.1"> </a>
+### 4.1 Khởi tạo data trên node master
     /usr/pgsql-9.6/bin/postgresql96-setup initdb
-# Config postgresql trên node master
-sửa các tham số sau trên file: /var/lib/pgsql/9.6/data/postgresql.conf  
+<a name="4.2"> </a>
+### 4.2 Config postgresql trên master node 
+- Sửa các tham số sau trên file: /var/lib/pgsql/9.6/data/postgresql.conf  
 
         listen_addresses = '*'  
         shared_preload_libraries = 'repmgr'   
@@ -75,8 +149,29 @@ sửa các tham số sau trên file: /var/lib/pgsql/9.6/data/postgresql.conf
         max_replication_slots = 2  
         hot_standby = on   
         log_checkpoints = on
+        
+- Cấu hình file /var/lib/pgsql/9.6/data/pg_hba.conf
 
-# Cấu hình file /etc/repmgr/9.6/repmgr.conf
+        cat <<EOF>> /var/lib/pgsql/9.6/data/pg_hba.conf
+        local   replication     repmgr                                  trust  
+        host    replication     repmgr          127.0.0.1/32            trust  
+        host    replication     repmgr          10.0.0.11/32            trust  
+        host    replication     repmgr          10.0.0.12/32            trust  
+        host    replication     repmgr          10.0.0.13/32            trust  
+        host    replication     repmgr          10.0.0.14/32            trust  
+        local   repmgr          repmgr                                  trust  
+        host    repmgr          repmgr          127.0.0.1/32            trust  
+        host    repmgr          repmgr          10.0.0.11/32            trust  
+        host    repmgr          repmgr          10.0.0.12/32            trust  
+        host    repmgr          repmgr          10.0.0.13/32            trust  
+        host    repmgr          repmgr          10.0.0.14/32            trust
+        EOF 
+    
+<a name="4.3"> </a>
+### 4.3 Config repmgr master node 
+
+Cấu hình file /etc/repmgr/9.6/repmgr.conf
+
     cp /etc/repmgr/9.6/repmgr.conf /etc/repmgr/9.6/repmgr.conf_org
     truncate -s 0 /etc/repmgr/9.6/repmgr.conf
     cat <<EOF>> /etc/repmgr/9.6/repmgr.conf
@@ -94,28 +189,12 @@ sửa các tham số sau trên file: /var/lib/pgsql/9.6/data/postgresql.conf
     event_notifications='standby_promote'
     pg_bindir='/usr/pgsql-9.6/bin/'
     EOF
-# Cấu hình file /var/lib/pgsql/9.6/data/pg_hba.conf
-Thêm các dòng sau vào cuối file:  
 
-    cat <<EOF>> /var/lib/pgsql/9.6/data/pg_hba.conf
-    local   replication     repmgr                                  trust  
-    host    replication     repmgr          127.0.0.1/32            trust  
-    host    replication     repmgr          10.0.0.11/32            trust  
-    host    replication     repmgr          10.0.0.12/32            trust  
-    host    replication     repmgr          10.0.0.13/32            trust  
-    host    replication     repmgr          10.0.0.14/32            trust  
-    local   repmgr          repmgr                                  trust  
-    host    repmgr          repmgr          127.0.0.1/32            trust  
-    host    repmgr          repmgr          10.0.0.11/32            trust  
-    host    repmgr          repmgr          10.0.0.12/32            trust  
-    host    repmgr          repmgr          10.0.0.13/32            trust  
-    host    repmgr          repmgr          10.0.0.14/32            trust
-    EOF  
-
-# Start service postgresql
+<a name="4.4"> </a>
+### 4.4 Start service postgresql
     systemctl start postgresql-9.6
-    systemctl enable postgresql-9.6
-# Primary: Register the primary server
+<a name="4.5"> </a>   
+### 4.5 Register the primary server
     su postgres
     createuser -s repmgr
     createdb repmgr -O repmgr
@@ -123,9 +202,11 @@ Thêm các dòng sau vào cuối file:
     repmgr cluster show
 <img src="./images/Screenshot 2021-11-05 235054.png" />  
 
-
-# Slave-1
-# Cấu hình file /etc/repmgr/9.6/repmgr.conf
+<a name="5"></a>
+### 5. Config node slave-1
+<a name="5.1"> </a>
+### 5.1 Config repmgr node slave-1
+Cấu hình file /etc/repmgr/9.6/repmgr.conf
 
     cp /etc/repmgr/9.6/repmgr.conf /etc/repmgr/9.6/repmgr.conf_org
     truncate -s 0 /etc/repmgr/9.6/repmgr.conf
@@ -144,16 +225,32 @@ Thêm các dòng sau vào cuối file:
     event_notifications='standby_promote'
     pg_bindir='/usr/pgsql-9.6/bin/'
     EOF
-# Clone  and register standby database tu node master
 
-    repmgr -h 10.0.0.11  -U repmgr -d repmgr standby clone
-    systemctl restart postgresql-9.6 &&  systemctl enable postgresql-9.6 # Run on root user
-    repmgr standby register
-    repmgr cluster show
-<img src="./images/Screenshot 2021-11-05 235637.png" />  
+<a name="5.2"> </a>
+### 5.2 Clone  and register standby database to master
+- Clone database từ node master
 
-# Slave-2
-# Cấu hình file /etc/repmgr/9.6/repmgr.conf
+        repmgr -h 10.0.0.11  -U repmgr -d repmgr standby clone
+
+- Restart serive postgres  
+
+        [root@node-2~] systemctl restart postgresql-9.6
+
+- Register standby cluster
+
+        repmgr standby register
+
+- Check status cluster
+
+        repmgr cluster show
+
+    <img src="./images/Screenshot 2021-11-05 235637.png" />  
+
+<a name="6"></a>
+### 6. Config node slave-2
+<a name="6.2"></a>
+### 6.1 Config repmgr node slave-2
+Cấu hình file /etc/repmgr/9.6/repmgr.conf
 
     cp /etc/repmgr/9.6/repmgr.conf /etc/repmgr/9.6/repmgr.conf_org
     truncate -s 0 /etc/repmgr/9.6/repmgr.conf
@@ -172,286 +269,353 @@ Thêm các dòng sau vào cuối file:
     event_notifications='standby_promote'
     pg_bindir='/usr/pgsql-9.6/bin/'
     EOF
-# Clone  and register standby database tu node master
+<a name="6.2"></a>
+### 6.2.Clone  and register standby database tu node master
+- Clone database từ node master
 
-    repmgr -h 10.0.0.11  -U repmgr -d repmgr standby clone
-    systemctl restart postgresql-9.6 && systemctl enable postgresql-9.6 # Run on root user
-    repmgr standby register
-    repmgr cluster show
-<img src="./images/Screenshot 2021-11-05 235927.png" />  
+        repmgr -h 10.0.0.11  -U repmgr -d repmgr standby clone
 
-# High Availability
-# Kịch bản node master down --> switch node-2 lên thành master. Node-3 replication từ new master node-2. Rejoin node-1 to cluster
-# Bước 1 shutdown node-1 check cluster trên node-2 và node-3
+- Restart serive postgres  
+
+        [root@node-3~] systemctl restart postgresql-9.6
+
+- Register standby cluster
+
+        repmgr standby register
+
+- Check status cluster
+
+        repmgr cluster show
+    <img src="./images/Screenshot 2021-11-05 235927.png" />  
+
+<a name="7"></a> 
+### 7. Demo High Availability switch master
+<a name="7.1"></a>
+### 7.1 Manual
+<a name="7.1.1"></a>
+### Bước 1: shutdown node-1 check cluster trên node-2 và node-3
 <img src="./images/Screenshot 2021-11-06 000330.png" />  
-
 <img src="./images/Screenshot 2021-11-06 000430.png" />  
 
-# Bước 2: promote node-2 lên thành node master
+<a name="7.1.2"></a>
+### Bước 2: promote node-2 lên thành node master
     repmgr standby promote
+
 <img src="./images/Screenshot 2021-11-06 001040.png" />  
 
-# Bước 3 : Đúng trên node-2 và node-3 check status cluster
-
+<a name="7.1.3"></a>
+### Bước 3 : Đúng trên node-2 và node-3 check status cluster
 <img src="./images/Screenshot 2021-11-06 001120.png" />  
-
 <img src="./images/Screenshot 2021-11-06 001146.png" />  
 
-# Bước 4: Set node-3 follow standby node-2
+<a name="7.1.4"></a>
+### Bước 4: Set node-3 follow standby node-2
     repmgr standby follow
-
 <img src="./images/Screenshot 2021-11-06 001355.png" /> 
 
-# Check lại trạng thái cluster
+<a name="7.1.5"></a>
+### Bước 5: Check lại trạng thái cluster
     repmgr cluster show
 <img src="./images/Screenshot 2021-11-06 001512.png" /> 
 
-# Bước 4: Start lại server node-1 và join lại vào cluster
-# Đứng trên node-3 check lại trạng thái cluster, node-1 đã online tuy nhiên đã bị khai trừ ra khỏi cluster
+<a name="7.1.6"></a>
+### Bước 6: Rejoin cluster
+- Check status cluster trên node-2 hoặc node-3
     repmgr cluster show
 <img src="./images/Screenshot 2021-11-06 004803.png" /> 
 
-# Stop service postgresql trên node-1
-    systemctl stop postgresql-9.6
+- Stop service postgresql trên node-1
+        
+        [root@node-1~] systemctl stop postgresql-9.6
 
-# Rejoin cluster
-    repmgr node rejoin -d 'host=node-2 dbname=repmgr user=repmgr' --force-rewind --config-files=postgresql.local.conf,postgresql.conf --verbose
-    repmgr standby follow
-<img src="./images/Screenshot 2021-11-06 005951.png" /> 
-<img src="./images/Screenshot 2021-11-06 010837.png" />
+- Rejoin cluster
 
-# Cài đặt auto switch master
-# Kiểm tra trạng thái cluster và repmgr service
-    repmgr cluster show
-    repmgr service status
-<img src="./images/Screenshot 2021-11-06 102357.png" />
+        repmgr node rejoin -d 'host=node-2 dbname=repmgr user=repmgr' \
+        --force-rewind \
+        --config-files=postgresql.local.conf,postgresql.conf \
+        --verbose
+    <img src="./images/Screenshot 2021-11-06 005951.png" /> 
+- Check lại trạng thái cluster
 
-# Start repmgr-96 trên tất cả các node:    
-    systemctl restart repmgr-96.service && systemctl enable repmgr-96.service
-# Check status repmgr
-     repmgr  service status
+        repmgr standby follow
+    <img src="./images/Screenshot 2021-11-06 010837.png" />
+
+<a name="7.2"></a>
+### 7.2 Auto switch master
+<a name="7.2.1"></a>
+### Bước 1: Kiểm tra trạng thái cluster và repmgr service
+- Check trạng thái cluster
+        
+        repmgr cluster show
+- Check status repmgr        
+    
+        repmgr service status
+    <img src="./images/Screenshot 2021-11-06 102357.png" />
+
+<a name="7.2.2"></a>
+### Bước 2: Start repmgr-96 trên tất cả các node:    
+    systemctl restart repmgr-96.service
+    systemctl enable repmgr-96.service
+<a name="7.2.3"></a>
+### Bước 3: Check status repmgr    
+    repmgr  service status
 <img src="./images/Screenshot 2021-11-06 102944.png" />
 
-# Check trạng thái cluster: master: node-1, standby: node-2, node-3
+<a name="7.2.4"></a>
+### Bước 4: Check trạng thái cluster: master: node-1, standby: node-2, node-3
     repmgr  cluster show
 <img src="./images/Screenshot 2021-11-06 100705.png" />
 
-# Tiến hành stop service postgresql-9.6 trên service node-1 và check lại trạng thái cluster
-    systemctl stop postgresql-9.6
-    repmgr  cluster show
-# Node-2 đã được switch thành master, node-3 đã được upstream theo node-2
+<a name="7.2.5"></a>
+### Bước 5: Stop service postgresql-9.6 trên service node-1, check status cluster
+- Stop servive postgresql
+
+        systemctl stop postgresql-9.6
+- Check status cluster
+        
+        repmgr cluster show
+- Node-2 đã switch thành master, node-3 đã uptream theo new master
 <img src="./images/Screenshot 2021-11-06 103107.png" />    
 
-# Tiến hành stop service postgresql-9.6 trên service node-2 và check lại trạng thái cluster
-    systemctl stop postgresql-9.6
-    repmgr  cluster show
-# Node-3 đã được switch thành master
-<img src="./images/Screenshot 2021-11-06 103247.png" />    
+<a name="7.2.6"></a>
+### Bước 6: Stop service postgresql-9.6 trên service node-2, check status cluster
+- Stop servive postgresql
+        
+        systemctl stop postgresql-9.6
+- Check status cluster
+        
+        repmgr cluster show
 
-# Start lại server node-1, node-2 và join lại vào cluster
+- Node-3 đã switch thành master
+    <img src="./images/Screenshot 2021-11-06 103247.png" />   
 
-# Stop service postgresql trên node-1, node-2
-    systemctl stop postgresql-9.6
+<a name="7.2.7"></a>
+### Bước 7: Start lại server node-1, node-2 và join lại vào cluster
+- Stop service postgresql trên node-1, node-2:
+ 
+        systemctl stop postgresql-9.6
 
-# Rejoin cluster
-     repmgr node rejoin -d 'host=node-3 dbname=repmgr user=repmgr' --force-rewind --config-files=postgresql.local.conf,postgresql.conf --verbose
-<img src="./images/Screenshot 2021-11-06 103701.png" />  
-<img src="./images/Screenshot 2021-11-06 103801.png" /> 
+- Rejoin cluster:
 
-# Cài đặt Haproxy loadblance
-# Config trên tất cả các node-pg
-    yum install xinetd -y
-# Tạo file confg xinetd check service postgres
-    touch /etc/xinetd.d/postgreschk
-    cat <<EOF>> /etc/xinetd.d/postgreschk
-    # default: on
-    # description: postgreschk
-    service postgreschk
-    {
-            flags           = REUSE
-            socket_type     = stream
-            port            = 9201
-            wait            = no
-            user            = root
-            server          = /usr/local/sbin/postgreschk
-            log_on_failure  += USERID
-            disable         = no
-            #only_from       = 0.0.0.0/0
-            only_from       = 0.0.0.0/0
-            per_source      = UNLIMITED
-    }
-    EOF
-# Add service check port postgres
-    echo "postgreschk        9201/tcp" >> /etc/services
-# Tạo script check service postgres
-    touch /usr/local/sbin/postgreschk
-    chmod +x /usr/local/sbin/postgreschk
-    cat <<EOF>> /usr/local/sbin/postgreschk
-    #!/bin/bash
-    #
-    # This script checks if a PostgreSQL server is healthy running on localhost. It will
-    # return:
-    # "HTTP/1.x 200 OK\r" (if postgres is running smoothly)
-    # - OR -
-    # "HTTP/1.x 500 Internal Server Error\r" (else)
-    #
-    # The purpose of this script is make haproxy capable of monitoring PostgreSQL properly
-    #
+        repmgr node rejoin -d 'host=node-3 dbname=repmgr user=repmgr' \
+        --force-rewind \
+        --config-files=postgresql.local.conf,postgresql.conf \
+        --verbose
+    <img src="./images/Screenshot 2021-11-06 103701.png" />  
+    <img src="./images/Screenshot 2021-11-06 103801.png" /> 
 
-    export PGHOST='10.0.0.11' # Doi IP cua tung node
-    export PGUSER='repmgr'
-    export PGPASSWORD='1'
-    export PGPORT='5432'
-    export PGDATABASE='repmgr'
-    export PGCONNECT_TIMEOUT=10
+<a name="8"></a>
+### 8. Cài đặt Haproxy loadblance
+<a name="8.1"></a>
+### 8.1 Install & Config trên các node-pg
+- Install xinetd package
 
-    FORCE_FAIL="/dev/shm/proxyoff"
+        yum install xinetd -y
 
-    SLAVE_CHECK="SELECT pg_is_in_recovery()"
-    WRITABLE_CHECK="SHOW transaction_read_only"
+- Tạo file confg xinetd check service postgres
 
-    return_ok()
-    {
-        echo -e "HTTP/1.1 200 OK\r\n"
-        echo -e "Content-Type: text/html\r\n"
-        if [ "$1x" == "masterx" ]; then
-            echo -e "Content-Length: 56\r\n"
+        touch /etc/xinetd.d/postgreschk
+        cat <<EOF>> /etc/xinetd.d/postgreschk
+        # default: on
+        # description: postgreschk
+        service postgreschk
+        {
+                flags           = REUSE
+                socket_type     = stream
+                port            = 9201
+                wait            = no
+                user            = root
+                server          = /usr/local/sbin/postgreschk
+                log_on_failure  += USERID
+                disable         = no
+                #only_from       = 0.0.0.0/0
+                only_from       = 0.0.0.0/0
+                per_source      = UNLIMITED
+        }
+        EOF
+-  Add service check port postgres
+  
+        echo "postgreschk        9201/tcp" >> /etc/services
+
+- Tạo script check service postgres
+
+        touch /usr/local/sbin/postgreschk
+        chmod +x /usr/local/sbin/postgreschk
+        cat <<EOF>> /usr/local/sbin/postgreschk
+        #!/bin/bash
+        #
+        # This script checks if a PostgreSQL server is healthy running on localhost. It will
+        # return:
+        # "HTTP/1.x 200 OK\r" (if postgres is running smoothly)
+        # - OR -
+        # "HTTP/1.x 500 Internal Server Error\r" (else)
+        #
+        # The purpose of this script is make haproxy capable of monitoring PostgreSQL properly
+        #
+
+        export PGHOST='10.0.0.11' # Doi IP cua tung node
+        export PGUSER='repmgr'
+        export PGPASSWORD='1'
+        export PGPORT='5432'
+        export PGDATABASE='repmgr'
+        export PGCONNECT_TIMEOUT=10
+
+        FORCE_FAIL="/dev/shm/proxyoff"
+
+        SLAVE_CHECK="SELECT pg_is_in_recovery()"
+        WRITABLE_CHECK="SHOW transaction_read_only"
+
+        return_ok()
+        {
+            echo -e "HTTP/1.1 200 OK\r\n"
+            echo -e "Content-Type: text/html\r\n"
+            if [ "$1x" == "masterx" ]; then
+                echo -e "Content-Length: 56\r\n"
+                echo -e "\r\n"
+                echo -e "<html><body>PostgreSQL master is running.</body></html>\r\n"
+            elif [ "$1x" == "slavex" ]; then
+                echo -e "Content-Length: 55\r\n"
+                echo -e "\r\n"
+                echo -e "<html><body>PostgreSQL slave is running.</body></html>\r\n"
+            else
+                echo -e "Content-Length: 49\r\n"
+                echo -e "\r\n"
+                echo -e "<html><body>PostgreSQL is running.</body></html>\r\n"
+            fi
             echo -e "\r\n"
-            echo -e "<html><body>PostgreSQL master is running.</body></html>\r\n"
-        elif [ "$1x" == "slavex" ]; then
-            echo -e "Content-Length: 55\r\n"
+
+            unset PGUSER
+            unset PGPASSWORD
+            exit 0
+        }
+
+        return_fail()
+        {
+            echo -e "HTTP/1.1 503 Service Unavailable\r\n"
+            echo -e "Content-Type: text/html\r\n"
+            echo -e "Content-Length: 48\r\n"
             echo -e "\r\n"
-            echo -e "<html><body>PostgreSQL slave is running.</body></html>\r\n"
-        else
-            echo -e "Content-Length: 49\r\n"
+            echo -e "<html><body>PostgreSQL is *down*.</body></html>\r\n"
             echo -e "\r\n"
-            echo -e "<html><body>PostgreSQL is running.</body></html>\r\n"
+
+            unset PGUSER
+            unset PGPASSWORD
+            exit 1
+        }
+
+        if [ -f "$FORCE_FAIL" ]; then
+            return_fail;
         fi
-        echo -e "\r\n"
 
-        unset PGUSER
-        unset PGPASSWORD
-        exit 0
-    }
+        # check if in recovery mode (that means it is a 'slave')
+        SLAVE=$(/usr/pgsql-9.6/bin/psql -qt -c "$SLAVE_CHECK" 2>/dev/null)
+        if [ $? -ne 0 ]; then
+            return_fail;
+        elif echo $SLAVE | egrep -i "(t|true|on|1)" 2>/dev/null >/dev/null; then
+            return_ok "slave"
+        fi
 
-    return_fail()
-    {
-        echo -e "HTTP/1.1 503 Service Unavailable\r\n"
-        echo -e "Content-Type: text/html\r\n"
-        echo -e "Content-Length: 48\r\n"
-        echo -e "\r\n"
-        echo -e "<html><body>PostgreSQL is *down*.</body></html>\r\n"
-        echo -e "\r\n"
+        # check if writable (then we consider it as a 'master')
+        READONLY=$(/usr/pgsql-9.6/bin/psql -qt -c "$WRITABLE_CHECK" 2>/dev/null)
+        if [ $? -ne 0 ]; then
+            return_fail;
+        elif echo $READONLY | egrep -i "(f|false|off|0)" 2>/dev/null >/dev/null; then
+            return_ok "master"
+        fi
 
-        unset PGUSER
-        unset PGPASSWORD
-        exit 1
-    }
+        return_ok "none";
+        EOF
 
-    if [ -f "$FORCE_FAIL" ]; then
-        return_fail;
-    fi
+<a name="8.2"></a>
 
-    # check if in recovery mode (that means it is a 'slave')
-    SLAVE=$(/usr/pgsql-9.6/bin/psql -qt -c "$SLAVE_CHECK" 2>/dev/null)
-    if [ $? -ne 0 ]; then
-        return_fail;
-    elif echo $SLAVE | egrep -i "(t|true|on|1)" 2>/dev/null >/dev/null; then
-        return_ok "slave"
-    fi
+### 8.2 Config haproxy
+- Tạo file config haproxy
 
-    # check if writable (then we consider it as a 'master')
-    READONLY=$(/usr/pgsql-9.6/bin/psql -qt -c "$WRITABLE_CHECK" 2>/dev/null)
-    if [ $? -ne 0 ]; then
-        return_fail;
-    elif echo $READONLY | egrep -i "(f|false|off|0)" 2>/dev/null >/dev/null; then
-        return_ok "master"
-    fi
+        cp /etc/haproxy/haproxy.cfg /etc/haproxy/haproxy.cfg_org
+        truncate -s 0 /etc/haproxy/haproxy.cfg
+        cat <<EOF>> /etc/haproxy/haproxy.cfg
+        global
+            pidfile /var/run/haproxy.pid
+            daemon
+            user haproxy
+            group haproxy
+            stats socket /var/run/haproxy.socket user haproxy group haproxy mode 600 level admin
+            node haproxy_haproxy-pg
+            description haproxy server
 
-    return_ok "none";
-    EOF
+            #* Performance Tuning
+            maxconn 8192
+            spread-checks 3
+            quiet
+        defaults
+            #log    global
+            mode    tcp
+            option  dontlognull
+            option tcp-smart-accept
+            option tcp-smart-connect
+            #option dontlog-normal
+            retries 3
+            option redispatch
+            maxconn 8192
+            timeout check   3500ms
+            timeout queue   3500ms
+            timeout connect 3500ms
+            timeout client  10800s
+            timeout server  10800s
 
-# Config file /etc/haproxy/haproxy.cfg
-    cp /etc/haproxy/haproxy.cfg /etc/haproxy/haproxy.cfg_org
-    truncate -s 0 /etc/haproxy/haproxy.cfg
-    cat <<EOF>> /etc/haproxy/haproxy.cfg
-    global
-        pidfile /var/run/haproxy.pid
-        daemon
-        user haproxy
-        group haproxy
-        stats socket /var/run/haproxy.socket user haproxy group haproxy mode 600 level admin
-        node haproxy_haproxy-pg
-        description haproxy server
+        userlist STATSUSERS
+            group admin users admin
+            user admin insecure-password admin
+            user stats insecure-password admin
 
-        #* Performance Tuning
-        maxconn 8192
-        spread-checks 3
-        quiet
-    defaults
-        #log    global
-        mode    tcp
-        option  dontlognull
-        option tcp-smart-accept
-        option tcp-smart-connect
-        #option dontlog-normal
-        retries 3
-        option redispatch
-        maxconn 8192
-        timeout check   3500ms
-        timeout queue   3500ms
-        timeout connect 3500ms
-        timeout client  10800s
-        timeout server  10800s
+        listen admin_page
+            bind *:9600
+            mode http
+            stats enable
+            stats refresh 60s
+            stats uri /
+            acl AuthOkay_ReadOnly http_auth(STATSUSERS)
+            acl AuthOkay_Admin http_auth_group(STATSUSERS) admin
+            stats http-request auth realm admin_page unless AuthOkay_ReadOnly
+            #stats admin if AuthOkay_Admin
 
-    userlist STATSUSERS
-        group admin users admin
-        user admin insecure-password admin
-        user stats insecure-password admin
-
-    listen admin_page
-        bind *:9600
-        mode http
-        stats enable
-        stats refresh 60s
-        stats uri /
-        acl AuthOkay_ReadOnly http_auth(STATSUSERS)
-        acl AuthOkay_Admin http_auth_group(STATSUSERS) admin
-        stats http-request auth realm admin_page unless AuthOkay_ReadOnly
-        #stats admin if AuthOkay_Admin
-
-    listen  haproxy_haproxy-pg_5433_rw_rw
-        bind *:5433
-        mode tcp
-        timeout client  10800s
-        timeout server  10800s
-        tcp-check connect port 9201
-        tcp-check expect string master\ is\ running
-        balance leastconn
-        option tcp-check
-    #   option allbackups
-        default-server port 9201 inter 2s downinter 5s rise 3 fall 2 slowstart 60s maxconn 64 maxqueue 128 weight 100
-        server 10.0.0.11 10.0.0.11:5432 check
-        server 10.0.0.12 10.0.0.12:5432 check
-        server 10.0.0.13 10.0.0.13:5432 check
+        listen  haproxy_haproxy-pg_5433_rw_rw
+            bind *:5433
+            mode tcp
+            timeout client  10800s
+            timeout server  10800s
+            tcp-check connect port 9201
+            tcp-check expect string master\ is\ running
+            balance leastconn
+            option tcp-check
+        #   option allbackups
+            default-server port 9201 inter 2s downinter 5s rise 3 fall 2 slowstart 60s maxconn 64 maxqueue 128 weight 100
+            server 10.0.0.11 10.0.0.11:5432 check
+            server 10.0.0.12 10.0.0.12:5432 check
+            server 10.0.0.13 10.0.0.13:5432 check
 
 
-    listen  haproxy_haproxy-pg_5434_ro
-        bind *:5434
-        mode tcp
-        timeout client  10800s
-        timeout server  10800s
-        tcp-check connect port 9201
-        tcp-check expect string is\ running
-        balance leastconn
-        option tcp-check
-    #   option allbackups
-        default-server port 9201 inter 2s downinter 5s rise 3 fall 2 slowstart 60s maxconn 64 maxqueue 128 weight 100
-        server 10.0.0.11 10.0.0.11:5432 check
-        server 10.0.0.12 10.0.0.12:5432 check
-        server 10.0.0.13 10.0.0.13:5432 check
-    EOF
-    systemctl restart haproxy
+        listen  haproxy_haproxy-pg_5434_ro
+            bind *:5434
+            mode tcp
+            timeout client  10800s
+            timeout server  10800s
+            tcp-check connect port 9201
+            tcp-check expect string is\ running
+            balance leastconn
+            option tcp-check
+        #   option allbackups
+            default-server port 9201 inter 2s downinter 5s rise 3 fall 2 slowstart 60s maxconn 64 maxqueue 128 weight 100
+            server 10.0.0.11 10.0.0.11:5432 check
+            server 10.0.0.12 10.0.0.12:5432 check
+            server 10.0.0.13 10.0.0.13:5432 check
+        EOF
+- Restart service haproxy
 
-# Check trạng thái backend trên dashboard: http://10.0.0.14:9600/ (User/pass: admin/admin)
+        systemctl restart haproxy
+<a name="8.3"> </a>
+### 8.3 Check trạng thái backend trên UI
+Check trạng thái backend trên dashboard:
+- Url: http://10.0.0.14:9600/ 
+- User/pass: admin/admin
 <img src="./images/Screenshot 2021-11-06 163417.png" /> 
