@@ -1,0 +1,103 @@
+# MaxScale documentation:
+# https://mariadb.com/kb/en/mariadb-maxscale-24/
+
+# Global parameters
+#
+# Complete list of configuration options:
+# https://mariadb.com/kb/en/mariadb-maxscale-24-mariadb-maxscale-configuration-guide/
+
+[maxscale]
+threads=auto
+syslog=1
+admin_host=0.0.0.0
+admin_secure_gui=false
+
+# Server definitions
+#
+# Set the address of the server to the network
+# address of a MariaDB server.
+#
+
+{% for rw_svr in sql_read_write_servers %}
+[{{ rw_svr.name }}]
+type=server
+address={{ rw_svr.address }}
+port={{ rw_svr.port }}
+protocol=MySQLBackend
+{% endfor %}
+
+{% for ro_svr in sql_read_only_servers %}
+[{{ ro_svr.name }}]
+type=server
+address={{ ro_svr.address }}
+port={{ ro_svr.port }}
+protocol=MySQLBackend
+{% endfor %}
+
+
+# Monitor for the servers
+#
+# This will keep MaxScale aware of the state of the servers.
+# MariaDB Monitor documentation:
+# https://mariadb.com/kb/en/mariadb-maxscale-24-mariadb-monitor/
+
+[MariaDB-Monitor]
+type=monitor
+module=mariadbmon
+
+servers={% for svr in sql_read_write_servers|list + sql_read_only_servers|list %}{{ svr.name }},{% endfor %}
+
+user={{ maxscale_db_user_name }}
+password={{ maxscale_db_user_password }}
+monitor_interval=2000
+
+# Service definitions
+#
+# Service Definition for a read-only service and
+# a read/write splitting service.
+#
+
+# ReadConnRoute documentation:
+# https://mariadb.com/kb/en/mariadb-maxscale-24-readconnroute/
+
+[Read-Only-Service]
+type=service
+router=readconnroute
+{% if sql_read_only_servers|length %}
+servers={% for ro_svr in sql_read_only_servers %}{{ ro_svr.name }},{% endfor %}
+{% else %}
+servers={% for rw_svr in sql_read_write_servers %}{{ rw_svr.name }},{% endfor %}
+{% endif %}
+
+user={{ maxscale_db_user_name }}
+password={{ maxscale_db_user_password }}
+router_options=slave
+
+# ReadWriteSplit documentation:
+# https://mariadb.com/kb/en/mariadb-maxscale-24-readwritesplit/
+
+[Read-Write-Service]
+type=service
+router=readwritesplit
+servers={% for rw_svr in sql_read_write_servers %}{{ rw_svr.name }},{% endfor %}
+
+user={{ maxscale_db_user_name }}
+password={{ maxscale_db_user_password }}
+
+# Listener definitions for the services
+#
+# These listeners represent the ports the
+# services will listen on.
+#
+
+[Read-Only-Listener]
+type=listener
+service=Read-Only-Service
+protocol=MariaDBClient
+port=4008
+
+[Read-Write-Listener]
+type=listener
+service=Read-Write-Service
+protocol=MariaDBClient
+port=4006

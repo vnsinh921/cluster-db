@@ -1,0 +1,8 @@
+sql_read_only_servers: []
+sql_read_write_servers:
+  - name: slave1
+    address: 127.0.0.1
+    port: 3306
+maxscale_db_user_name: myuser
+maxscale_db_user_password: mypwd
+
