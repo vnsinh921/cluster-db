@@ -1,0 +1,13 @@
+cluster='{{ cluster_name }}'
+node_id={{ node_id }}
+node_name={{ node_name }}
+conninfo='host={{ ip_node }}  user=repmgr dbname=repmgr connect_timeout=2'
+data_directory='/var/lib/pgsql/{{ version }}/data'
+failover=automatic
+reconnect_attempts=20
+reconnect_interval=6
+promote_command='/usr/pgsql-{{ version }}/bin/repmgr standby promote --log-to-file'
+follow_command='/usr/pgsql-{{ version }}/bin/repmgr standby follow --log-to-file --upstream-node-id=%n'
+log_file='/var/log/repmgr/repmgrd-{{ version }}.log'
+event_notifications='standby_promote'
+pg_bindir='/usr/pgsql-{{ version }}/bin/'

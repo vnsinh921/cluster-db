@@ -1,0 +1,162 @@
+---
+# tasks file for roles/postgresql-repmgr
+
+- name: Install postgresql repository
+  yum: 
+    name: https://download.postgresql.org/pub/repos/yum/reporpms/EL-7-x86_64/pgdg-redhat-repo-latest.noarch.rpm
+
+- name: Install postgresql {{ version }}
+  yum:  
+    pkg: "{{ item }}"
+    state: present
+  with_items:  
+    - postgresql{{ version }}
+    - postgresql{{ version }}-server
+    - postgresql{{ version }}-contrib
+    - postgresql{{ version }}-libs
+
+- name: Create symbolic link pg_ctl
+  command: ln -s /usr/pgsql-{{ version }}/bin/pg_ctl /usr/bin/
+  ignore_errors: yes
+
+- name: Create bashrc user postgres
+  template:
+    src: bashrc
+    dest: /var/lib/pgsql/.bashrc
+    owner: postgres
+    group: postgres
+
+- name: Create bash_profile user postgres
+  template:
+    src: bash_profile.j2
+    dest: /var/lib/pgsql/.bash_profile
+    owner: postgres
+    group: postgres
+
+- name: Create log directory postgresql
+  file:
+    path: /var/log/postgresql
+    state: directory
+    owner: postgres
+    group: postgres
+  ignore_errors: yes
+
+- name: Create archive files directory postgresql
+  file:
+    path: /var/lib/pgsql/{{ version }}/archives
+    state: directory
+    owner: postgres
+    group: postgres
+  ignore_errors: yes
+
+- name: Start data postgresql is master
+  command: /usr/pgsql-{{ version }}/bin/postgresql-{{ version }}-setup initdb
+  when: is_master == True
+  ignore_errors: yes
+
+- name: Config postgresql-{{ version }}
+  template:
+    src: "postgresql{{ version }}.j2"
+    dest: "/var/lib/pgsql/{{ version }}/data/postgresql.conf"
+    owner: postgres
+    group: postgres
+  when: is_master == True
+
+- name: Config pg_hba
+  template:
+    src: "pg_hba.conf.j2"
+    dest: "/var/lib/pgsql/{{ version }}/data/pg_hba.conf"
+    owner: postgres
+    group: postgres  
+  when: is_master == True
+
+- name: Install repmgr {{ version}}
+  yum: 
+    name: repmgr{{ version}}
+    state: present
+
+- name: Config repmgr-{{ version }}
+  template:
+    src: "repmgr.conf.j2"
+    dest: "/etc/repmgr/{{ version }}/repmgr.conf"
+
+
+- name: Create symbolic link repmgr
+  command: ln -s /usr/pgsql-{{ version }}/bin/repmgr /usr/bin/
+  ignore_errors: yes
+
+- name: Create /run/repmgr directory run PID
+  file:
+    path: /run/repmgr
+    state: directory
+    owner: postgres
+    group: postgres
+  ignore_errors: yes
+
+- name: Restart service postgresql-{{ version }} master node
+  service: 
+    name: postgresql-{{ version }}
+    state: restarted
+  when: is_master == True
+
+- name: Install python-psycopg2
+  yum:
+    name: python-psycopg2
+    state: present
+  
+- name: Create user repmgr master node
+  postgresql_user:
+    user: "repmgr"
+    password: "{{ repmgr_pass }}"
+    role_attr_flags: "SUPERUSER"
+  become: true
+  become_user: postgres
+  when: is_master == True
+
+- name: Create database repmgr master node
+  postgresql_db: 
+    name: repmgr    
+    template: 'template0' 
+  become: true
+  become_user: postgres
+  when: is_master == True
+
+- name: Register the primary to cluster master node
+  command: repmgr primary register 
+  become: true
+  become_user: postgres
+  when: is_master == True
+
+- name: Delete directory data postgresql 
+  file:
+    state: absent
+    path: /var/lib/pgsql/{{ version }}/data
+  when: is_master == False
+
+- name: Clone source database to primary standby node 
+  command: repmgr -h {{ master_ip }}  -U repmgr -d repmgr standby clone
+  become: true
+  become_user: postgres
+  when: is_master == False
+
+- name: Restart service postgresql-{{ version }} standby node
+  service: 
+    name: postgresql-{{ version }}
+    state: restarted
+  when: is_master == False
+
+- name: Register the standby to cluster standby node
+  command: repmgr standby register 
+  become: true
+  become_user: postgres
+  when: is_master == False
+
+- name: Restart service repmgr-{{ version }} all node
+  service: 
+    name: repmgr-{{ version }}
+    state: restarted
+
+- name: Enable service repmgr-{{ version }} auto start all node
+  service: 
+    name: repmgr-{{ version }}
+    enabled: yes

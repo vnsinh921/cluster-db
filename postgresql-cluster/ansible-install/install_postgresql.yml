@@ -1,0 +1,4 @@
+- hosts: postgresql
+  become: yes
+  roles:
+    - {role: postgresql-repmgr, tags: postgresql-repmgr}

@@ -1,0 +1,4 @@
+is_master: True
+node_name: pg-1
+node_id: 1
+ip_node: 10.0.0.11
