@@ -3,6 +3,17 @@ version: 12
 list_ip_node:
   - 10.0.0.11
   - 10.0.0.12
+  - 10.0.0.14
 cluster_name: pg-cluster
+repmgr_user: repmgr
 repmgr_pass: bAadcXTCe5s2Gwjh
+repmgr_db: repmgr
 master_ip: 10.0.0.11
+
+# Repmgr check
+PGHOST: "{{ip_node}}"
+PGUSER: "{{repmgr_user}}"
+PGPASSWORD: "{{repmgr_pass}}"
+PGPORT: 5432
+PGDATABASE: "{{repmgr_db}}"
+PGCONNECT_TIMEOUT: 10

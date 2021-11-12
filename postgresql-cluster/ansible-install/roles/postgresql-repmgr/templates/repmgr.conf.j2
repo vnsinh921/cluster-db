@@ -1,7 +1,7 @@
 cluster='{{ cluster_name }}'
 node_id={{ node_id }}
 node_name={{ node_name }}
-conninfo='host={{ ip_node }}  user=repmgr dbname=repmgr connect_timeout=2'
+conninfo='host={{ ip_node }}  user={{ repmgr_user }} dbname={{ repmgr_db }} connect_timeout=2'
 data_directory='/var/lib/pgsql/{{ version }}/data'
 failover=automatic
 reconnect_attempts=20

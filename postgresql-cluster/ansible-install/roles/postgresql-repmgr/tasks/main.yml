@@ -69,6 +69,7 @@
     owner: postgres
     group: postgres  
   when: is_master == True
+  tags: hba
 
 - name: Install repmgr {{ version}}
   yum: 
@@ -106,7 +107,7 @@
   
 - name: Create user repmgr master node
   postgresql_user:
-    user: "repmgr"
+    user: "{{ repmgr_user }}"
     password: "{{ repmgr_pass }}"
     role_attr_flags: "SUPERUSER"
   become: true
@@ -115,7 +116,7 @@
 
 - name: Create database repmgr master node
   postgresql_db: 
-    name: repmgr    
+    name: "{{ repmgr_db }}"    
     template: 'template0' 
   become: true
   become_user: postgres
@@ -126,12 +127,6 @@
   become: true
   become_user: postgres
   when: is_master == True
-
-- name: Delete directory data postgresql 
-  file:
-    state: absent
-    path: /var/lib/pgsql/{{ version }}/data
-  when: is_master == False
 
 - name: Clone source database to primary standby node 
   command: repmgr -h {{ master_ip }}  -U repmgr -d repmgr standby clone
@@ -151,6 +146,13 @@
   become_user: postgres
   when: is_master == False
 
+- name: Check status cluster
+  shell: repmgr cluster show
+  become: true
+  become_user: postgres
+  register: output
+- debug: var=output.stdout_lines
+
 - name: Restart service repmgr-{{ version }} all node
   service: 
     name: repmgr-{{ version }}
@@ -159,4 +161,42 @@
 - name: Enable service repmgr-{{ version }} auto start all node
   service: 
     name: repmgr-{{ version }}
+    enabled: yes
+
+# Install xinetd package haproxy check
+- name: Install xinetd package
+  yum:
+    name: xinetd
+  tags: xinetd
+
+- name: Config xinetd
+  template:
+    src: "postgreschk.conf.j2"
+    dest: "/etc/xinetd.d/postgreschk"   
+  tags: xinetd
+
+- name: Create script check status postgres
+  template:
+    src: "postgreschk.sh.j2"
+    dest: "/usr/local/sbin/postgreschk"
+    owner: postgres
+    group: postgres
+    mode: 777 
+  tags: xinetd
+
+- name: Config service xinetd port
+  lineinfile:
+    path: /etc/services
+    line: postgreschk        9201/tcp
+    create: yes
+  tags: xinetd
+
+- name: Restart service xinetd
+  service: 
+    name: xinetd
+    state: restarted
+
+- name: Enable service xinetd
+  service: 
+    name: xinetd
     enabled: yes

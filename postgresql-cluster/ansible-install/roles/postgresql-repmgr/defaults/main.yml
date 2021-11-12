@@ -2,9 +2,18 @@
 # defaults file for roles/postgresql-repmgr
 version: 12 
 cluster_name: pg-cluster
+repmgr_user: repmgr
 repmgr_pass: bAadcXTCe5s2Gwjh
+repmgr_db: repmgr
 master_ip: 127.0.0.1
 is_master: True
 node_name: pg-1
 node_id: 1
 ip_node: 127.0.0.1
+# Repmgr check
+PGHOST: "{{ip_node}}"
+PGUSER: "{{repmgr_user}}"
+PGPASSWORD: "{{repmgr_pass}}"
+PGPORT: 5432
+PGDATABASE: "{{repmgr_db}}"
+PGCONNECT_TIMEOUT: 10

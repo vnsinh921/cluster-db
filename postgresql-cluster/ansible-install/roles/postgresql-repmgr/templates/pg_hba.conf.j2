@@ -11,14 +11,16 @@ host    all             all             ::1/128                 ident
 local   replication     all                                     peer
 host    replication     all             127.0.0.1/32            ident
 host    replication     all             ::1/128                 ident
-
+#host    all             all             all                     md5
 # Repmgr config
-local   replication     repmgr                                  trust
-host    replication     repmgr          127.0.0.1/32            trust
-host    replication     repmgr          10.0.0.11/32            trust
-host    replication     repmgr          10.0.0.12/32            trust
+local   replication     {{ repmgr_user }}                                  trust
+host    replication     {{ repmgr_user }}          127.0.0.1/32            trust
+{% for ip in list_ip_node %}
+host    replication     {{ repmgr_user }}          {{ ip }}/32            trust
+{% endfor %}
 
-local   repmgr          repmgr                                  trust  
-host    repmgr          repmgr          127.0.0.1/32            trust
-host    repmgr          repmgr          10.0.0.11/32            trust
-host    repmgr          repmgr          10.0.0.12/32            trust
+local   {{ repmgr_db }}         {{ repmgr_user }}                                  trust  
+host    {{ repmgr_db }}         {{ repmgr_user }}          127.0.0.1/32            trust
+{% for ip in list_ip_node %}
+host    {{ repmgr_db }}         {{ repmgr_user }}          {{ ip }}/32            trust
+{% endfor %}
