@@ -1,0 +1,260 @@
+---
+# Include var file
+- name: Autoremove unused packages
+  command: apt-get -y autoremove
+  register: autoremove_output
+  changed_when: "'The following packages will be REMOVED' in autoremove_output.stdout"
+
+- name: Add an Apt signing key, uses whichever key is at the URL
+  apt_key:
+    url: https://www.postgresql.org/media/keys/ACCC4CF8.asc
+    #keyring: /etc/apt/sources.list.d/pgdg.list
+    state: present
+
+- name: apt import GPG 
+  command: echo "deb http://apt.postgresql.org/pub/repos/apt/ `lsb_release -cs`-pgdg main" |sudo tee  /etc/apt/sources.list.d/pgdg.list
+
+- name: Install package postgresql-{{ version }}
+  apt: 
+    name: "{{ item }}" 
+    state: present 
+    update_cache: yes
+  with_items:
+    - postgresql-contrib-{{ version }}
+    - postgresql-{{ version }}
+    - postgresql-client-{{ version }}
+    - postgresql-{{ version }}-repmgr
+
+- name: Create config postgres 
+  template:
+    src: ./ubuntu/{{ item }}
+    dest: /var/lib/postgresql/{{ version }}/main/
+    owner: postgres
+    group: postgres
+  with_items:
+    - environment
+    - pg_ctl.conf
+    - pg_ident.conf
+    - start.conf
+  when: is_master == True
+
+- name: Config postgresql-{{ version }}
+  template:
+    src: ./ubuntu/postgresql-{{ version }}.conf.j2
+    dest: /var/lib/postgresql/{{ version }}/main/postgresql.conf
+    owner: postgres
+    group: postgres
+  when: is_master == True
+
+- name: Config pg_hba
+  template:
+    src: ./ubuntu/pg_hba.conf.j2
+    dest: /var/lib/postgresql/{{ version }}/main/pg_hba.conf
+    owner: postgres
+    group: postgres
+  when: is_master == True
+- name: Create bashrc user postgres
+  template:
+    src: ./ubuntu/bashrc
+    dest:  /var/lib/postgresql/.bashrc
+    owner: postgres
+    group: postgres
+
+- name: Create bash_profile user postgres
+  template:
+    src: ./ubuntu/bash_profile.j2
+    dest:  /var/lib/postgresql/.bash_profile
+    owner: postgres
+    group: postgres
+- name: Create  configuration directory postgresql
+  file:
+    path: /var/lib/postgresql/{{ version }}/main/conf.d
+    state: directory
+    owner: postgres
+    group: postgres
+  when: is_master == True
+
+- name: Create archive files directory postgresql
+  file:
+    path: /var/lib/postgresql/{{ version }}/archives
+    state: directory
+    owner: postgres
+    group: postgres
+
+- name: Remove file old config /etc/postgresql/{{ version }}/main/postgresql.conf
+  file:
+    path: /etc/postgresql/{{ version}}/main/postgresql.conf
+    state: absent
+
+- name: Create a symbolic link /etc/postgresql/{{ version }}/main/postgresql.conf master node
+  file:
+    src: /var/lib/postgresql/{{ version }}/main/postgresql.conf
+    dest: /etc/postgresql/{{ version }}/main/postgresql.conf
+    state: link
+  when: is_master == True
+    
+- name: Restart service postgresql-{{ version }} master node
+  service: 
+    name: postgresql@{{ version }}-main
+    state: restarted
+  when: is_master == True
+
+- name: Install repmgr 
+  apt: 
+    name: repmgr
+    state: present
+
+- name: Config repmgr
+  template:
+    src: ./ubuntu/repmgr.conf.j2
+    dest: /etc/repmgr.conf
+    owner: postgres
+    group: postgres
+
+- name: Config repmgrd
+  file:
+    src: repmgrd
+    dest: /etc/default/repmgrd
+
+- name: Create repmgr log files directory 
+  file:
+    path: /var/log/repmgr
+    state: directory
+    owner: postgres
+    group: postgres
+
+- name: Force systemd to reread configs
+  systemd: daemon_reload=yes
+
+- name: Install python-psycopg2
+  apt:
+    name: "{{ item }}" 
+    state: present
+  with_items:
+    - python-psycopg2
+    - python3-psycopg2
+  ignore_errors: yes
+  
+- name: Create user repmgr master node
+  postgresql_user:
+    user: "{{ repmgr_user }}"
+    password: "{{ repmgr_pass }}"
+    role_attr_flags: "SUPERUSER"
+  become: true
+  become_user: postgres
+  when: is_master == True
+
+- name: Create database repmgr master node
+  postgresql_db: 
+    name: "{{ repmgr_db }}"    
+    template: 'template0' 
+  become: true
+  become_user: postgres
+  when: is_master == True
+
+- name: Register the primary to cluster master node
+  command: repmgr primary register --force
+  become: true
+  become_user: postgres
+  when: is_master == True
+
+- name: Remove file old data postgresql standby node
+  file:
+    path: /var/lib/postgresql/{{ version}}/main
+    state: absent
+  when: is_master == False  
+- name: Stop service postgre standy node
+  command: systemctl stop postgresql@12-main
+  when: is_master == False
+  
+- name: Clone source database to primary standby node 
+  command: repmgr -h {{ master_ip }}  -U repmgr -d repmgr standby clone 
+  become: true
+  become_user: postgres
+  when: is_master == False
+
+- name: Create a symbolic link /etc/postgresql/{{ version }}/main/postgresql.conf master node
+  file:
+    src: /var/lib/postgresql/{{ version }}/main/postgresql.conf
+    dest: /etc/postgresql/{{ version }}/main/postgresql.conf
+    state: link
+  when: is_master == False
+  
+- name: Restart service postgresql-{{ version }} standby node
+  service: 
+    name: postgresql@{{ version }}-main
+    state: restarted
+  when: is_master == False
+
+- name: Register the standby to cluster standby node
+  command: repmgr standby register --force
+  become: true
+  become_user: postgres
+  when: is_master == False
+
+- name: Check status cluster
+  shell: repmgr cluster show
+  become: true
+  become_user: postgres
+  register: output
+- debug: var=output.stdout_lines
+
+- name: Restart service repmgrd all node
+  service: 
+    name: repmgrd
+    state: restarted
+
+- name: Enable service repmgrd auto start all node
+  service: 
+    name: repmgrd
+    enabled: yes
+
+- name: Repmgr service start
+  command: repmgrd  --verbose 
+  become: true
+  become_user: postgres
+
+- name: Check repmgr service status
+  command: repmgrd service status
+  become: true
+  become_user: postgres
+  register: output
+- debug: var=output.stdout_lines
+ 
+# Install xinetd package haproxy check
+- name: Install xinetd package
+  apt:
+    name: xinetd
+  tags: xinetd
+
+- name: Config xinetd
+  template:
+    src: "./ubuntu/postgreschk.conf.j2"
+    dest: "/etc/xinetd.d/postgreschk"   
+  tags: xinetd
+
+- name: Create script check status postgres
+  template:
+    src: "./ubuntu/postgreschk.sh.j2"
+    dest: "/usr/local/sbin/postgreschk"
+    owner: postgres
+    group: postgres
+    mode: 777 
+  tags: xinetd
+
+- name: Config service xinetd port
+  lineinfile:
+    path: /etc/services
+    line: postgreschk        9201/tcp
+    create: yes
+  tags: xinetd
+
+- name: Restart service xinetd
+  service: 
+    name: xinetd
+    state: restarted
+
+- name: Enable service xinetd
+  service: 
+    name: xinetd
+    enabled: yes

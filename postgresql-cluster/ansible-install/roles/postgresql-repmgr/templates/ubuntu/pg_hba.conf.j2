@@ -1,0 +1,26 @@
+# TYPE  DATABASE        USER            ADDRESS                 METHOD
+
+# "local" is for Unix domain socket connections only
+local   all             all                                     peer
+# IPv4 local connections:
+host    all             all             127.0.0.1/32            ident
+# IPv6 local connections:
+host    all             all             ::1/128                 ident
+# Allow replication connections from localhost, by a user with the
+# replication privilege.
+local   replication     all                                     peer
+host    replication     all             127.0.0.1/32            ident
+host    replication     all             ::1/128                 ident
+#host    all             all             all                     md5
+# Repmgr config
+local   replication     {{ repmgr_user }}                                  trust
+host    replication     {{ repmgr_user }}          127.0.0.1/32            trust
+{% for ip in list_ip_node %}
+host    replication     {{ repmgr_user }}          {{ ip }}/32            trust
+{% endfor %}
+
+local   {{ repmgr_db }}         {{ repmgr_user }}                                  trust  
+host    {{ repmgr_db }}         {{ repmgr_user }}          127.0.0.1/32            trust
+{% for ip in list_ip_node %}
+host    {{ repmgr_db }}         {{ repmgr_user }}          {{ ip }}/32            trust
+{% endfor %}
