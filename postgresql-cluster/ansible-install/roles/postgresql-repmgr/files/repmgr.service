@@ -1,0 +1,13 @@
+[Unit]
+Description=Unturned Game Server
+
+[Install]
+WantedBy=multi-user.target
+
+[Service]
+ExecStart=su -c "repmgrd --verbose" -s /bin/bash postgres
+Type=simple
+User=root
+Group=root
+WorkingDirectory=/root/
+Restart=on-failure

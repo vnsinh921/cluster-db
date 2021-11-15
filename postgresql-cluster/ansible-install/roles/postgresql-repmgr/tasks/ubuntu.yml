@@ -110,11 +110,17 @@
     dest: /etc/repmgr.conf
     owner: postgres
     group: postgres
+    mode: 0644
 
-- name: Config repmgrd
-  file:
-    src: repmgrd
-    dest: /etc/default/repmgrd
+- name: Config pg_hba
+  template:
+    src: ./ubuntu/repmgr.service.j2
+    dest: /usr/lib/systemd/system/repmgr-12.service
+    owner: postgres
+    group: postgres
+
+- name: Force systemd to reread configs
+  systemd: daemon_reload=yes
 
 - name: Create repmgr log files directory 
   file:
@@ -122,9 +128,6 @@
     state: directory
     owner: postgres
     group: postgres
-
-- name: Force systemd to reread configs
-  systemd: daemon_reload=yes
 
 - name: Install python-psycopg2
   apt:
@@ -199,14 +202,14 @@
   register: output
 - debug: var=output.stdout_lines
 
-- name: Restart service repmgrd all node
+- name: Restart service repmgr.service all node
   service: 
-    name: repmgrd
+    name: repmgr-12
     state: restarted
 
-- name: Enable service repmgrd auto start all node
+- name: Enable service repmgr.service all node
   service: 
-    name: repmgrd
+    name: repmgr-12
     enabled: yes
 
 - name: Repmgr service start
@@ -215,11 +218,11 @@
   become_user: postgres
 
 - name: Check repmgr service status
-  command: repmgrd service status
+  command: repmgr service status
   become: true
   become_user: postgres
-  register: output
-- debug: var=output.stdout_lines
+  register: output_status
+- debug: var=output_status.stdout_lines
  
 # Install xinetd package haproxy check
 - name: Install xinetd package
