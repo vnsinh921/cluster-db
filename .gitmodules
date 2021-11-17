@@ -7,3 +7,9 @@
 [submodule "postgresql-cluster/ansible-install/roles/haproxy-postgresql"]
 	path = postgresql-cluster/ansible-install/roles/haproxy-postgresql
 	url = git@github.com:vnsinh921/haproxy-postgresql.git
+[submodule "mysql-cluster/ansible-install/roles/mysql-percona-xtradb"]
+	path = mysql-cluster/ansible-install/roles/mysql-percona-xtradb
+	url = git@github.com:vnsinh921/mysql-percona-xtradb.git
+[submodule "mysql-cluster/ansible-install/roles/mysql-maxscale"]
+	path = mysql-cluster/ansible-install/roles/mysql-maxscale
+	url = git@github.com:vnsinh921/mysql-maxscale.git

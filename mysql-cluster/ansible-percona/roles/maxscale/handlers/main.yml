@@ -1,5 +1,0 @@
----
-- name: restart MaxScale
-  service:
-    name: maxscale
-    state: restarted
