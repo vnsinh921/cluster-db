@@ -1,0 +1,9 @@
+[submodule "postgresql-cluster/ansible-install/roles/postgresql-repmgr"]
+	path = postgresql-cluster/ansible-install/roles/postgresql-repmgr
+	url = git@github.com:vnsinh921/postgresql-repmgr.git
+[submodule "postgresql-cluster/ansible-install/roles/postgresql-database"]
+	path = postgresql-cluster/ansible-install/roles/postgresql-database
+	url = git@github.com:vnsinh921/postgresql-database.git
+[submodule "postgresql-cluster/ansible-install/roles/haproxy-postgresql"]
+	path = postgresql-cluster/ansible-install/roles/haproxy-postgresql
+	url = git@github.com:vnsinh921/haproxy-postgresql.git
