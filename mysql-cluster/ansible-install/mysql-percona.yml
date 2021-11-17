@@ -1,4 +1,4 @@
 - hosts: mysql-percona
   become: yes
   roles:
-    - {role: percona, tags: percona}
+    - {role: mysql-percona-xtradb, tags: mysql-percona-xtradb}

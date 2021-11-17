@@ -1,4 +1,4 @@
 - hosts: postgresql-ha
   become: yes
   roles:
-    - {role: haproxy, tags: haproxy}
+    - {role: haproxy-postgresql, tags: haproxy-postgresql}

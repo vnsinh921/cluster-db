@@ -2,5 +2,3 @@
   become: yes
   roles:
     - {role: postgresql-repmgr, tags: postgresql-repmgr}
-#    - {role: haproxy, tags: haproxy}
-#    - {role: psql-database, tags: psql-database}
