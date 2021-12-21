@@ -1,0 +1,128 @@
+Qourum server
+yum install pcs corosync-qnetd iscsi-initiator-utils scsi-target-utils -y
+nano /etc/tgt/targets.conf
+	default-driver iscsi
+	<target qr-1>
+	   backing-store /iscsi_img/disk01.img
+	   initiator-address 10.0.0.11
+	   initiator-address 10.0.0.12
+	</target>
+systemctl restart iscsid && systemctl restart  tgtd
+
+systemctl status iscsid && systemctl status  tgtd
+systemctl enable iscsid && systemctl enable  tgtd
+
+netstat -npl |grep 3260
+systemctl restart pcsd
+systemctl status pcsd
+netstat -npl |grep 2224
+echo "firstclt" | sudo passwd hacluster --stdin
+corosync-qnetd-certutil -i
+
+#DB-server: 2node
+yum install epel-release -y
+rpm --import https://www.elrepo.org/RPM-GPG-KEY-elrepo.org
+rpm -Uvh http://www.elrepo.org/elrepo-release-7.0-3.el7.elrepo.noarch.rpm
+yum install -y pacemaker pcs drbd90-utils kmod-drbd90 iscsi-initiator-utils corosync-qdevice sbd fence-agents-sbd
+
+sudo yum -y install https://download.postgresql.org/pub/repos/yum/reporpms/EL-7-x86_64/pgdg-redhat-repo-latest.noarch.rpm
+
+sudo yum-config-manager --enable pgdg12
+sudo yum install postgresql12-server postgresql12
+
+iscsiadm -m discovery -t sendtargets -p 10.0.0.9 # Discover
+iscsiadm -m node -T quorum-1 -p 10.0.0.9 -l #login
+iscsiadm -m session #check
+
+pvcreate /dev/sdb
+vgcreate vg /dev/sdb
+lvcreate --size 1024MB --name lv vg
+
+nano /etc/drbd.d/pgres.res
+	resource pgres {
+		protocol C;
+		disk {on-io-error detach; resync-rate 10M;}
+		syncer{}
+		net{ping-timeout 30;}
+		on pg-1 {
+			device /dev/drbd0;
+			disk /dev/mapper/vg-lv;
+			address 10.0.0.11:7791;
+			meta-disk internal;
+			node-id 1;
+		}
+		on pg-2 {
+			device /dev/drbd0;
+			disk /dev/mapper/vg-lv;
+			address 10.0.0.12:7791;
+			meta-disk internal;
+			node-id 2;
+		}
+	}
+	 
+drbdadm create-md pgres
+systemctl start drbd
+systemctl enable drbd
+
+
+#Node-1
+
+drbdadm primary pgres --force
+drbdadm status pgres
+mkfs.xfs /dev/drbd0 -L PGDATA -f
+# 2Node
+echo softdog > /etc/modules-load.d/softdog.conf
+systemctl restart systemd-modules-load
+systemctl status systemd-modules-load
+lsmod |grep dog
+
+#sbd resiter 2 node
+
+ls -la /dev/disk/by-id/scsi-360000000000000000e00000000010001
+# Node 1
+nano /etc/sysconfig/sbd
+SBD_DEVICE=/dev/disk/by-id/scsi-360000000000000000e00000000010001
+SBD_DELAY_START=no
+SBD_OPTS="-n pg-1"
+SBD_PACEMAKER=yes
+SDB_STARTMODE=always
+SDB_WATCHDOG_DEV=/dev/watchdog
+SBD_WATCHDOG_TIMEOUT=5
+# Node 2
+nano /etc/sysconfig/sbd
+SBD_DEVICE=/dev/disk/by-id/scsi-360000000000000000e00000000010001
+SBD_DELAY_START=no
+SBD_OPTS="-n pg-2"
+SBD_PACEMAKER=yes
+SDB_STARTMODE=always
+SDB_WATCHDOG_DEV=/dev/watchdog
+SBD_WATCHDOG_TIMEOUT=5
+
+
+#Node-1
+sbd -d /dev/disk/by-id/scsi-360000000000000000e00000000010001 create
+
+# @node
+
+echo "firstclt" | sudo passwd hacluster --stdin
+systemctl start pcsd.service
+systemctl enable pcsd.service
+pcs cluster auth pg-1 pg-2 -u hacluster -p firstclt
+# Node1
+
+pcs cluster setup --name firstcluster pg-1 pg-2 --force --start
+pcs cluster start --all
+pcs cluster enable --all
+pcs property set stonith-enabled=true
+pcs property set have-watchdog=true
+pcs property set no-quorum-policy=suicide
+pcs property set cluster-recheck-interval=10m
+pcs property default-resource-stickness=100
+pcs resource defaults resource-stickness=100
+
+pcs cluster stop --all
+pcs cluster auth 10.0.0.11 -u hacluster -p firstclt
+pcs quorum device add model net host=10.0.0.9 algorithm=ffsplit
+pcs stonith sbd enable
+pcs cluster start --all
+systemctl status sbd
