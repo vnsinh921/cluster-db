@@ -659,3 +659,4 @@ repmgr cluster show
     -   https://www.postgresql.org/docs/  
     -   https://repmgr.org/docs/repmgr.html  
     -   https://www.percona.com/blog/2019/11/08/configure-haproxy-with-postgresql-using-built-in-pgsql-check/
+    -   https://severalnines.com/database-blog/driving-performance-postgresql-haproxy
