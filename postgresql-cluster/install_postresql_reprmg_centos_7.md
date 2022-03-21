@@ -539,10 +539,10 @@ repmgr cluster show
     if [ -f "$FORCE_FAIL" ]; then
         return_fail;
     fi
-
+    CLUSTER=$(runuser -l postgres -c 'repmgr cluster show' |grep 'running as primary' 2> /dev/null)
     # check if in recovery mode (that means it is a 'slave')
     SLAVE=$(/usr/pgsql-9.6/bin/psql -qt -c "$SLAVE_CHECK" 2>/dev/null)
-    if [ $? -ne 0 ]; then
+    if [ $? -ne 0 ] || [ "$CLUSTER" != "" ]; then
         return_fail;
     elif echo $SLAVE | egrep -i "(t|true|on|1)" 2>/dev/null >/dev/null; then
         return_ok "slave"
@@ -550,7 +550,7 @@ repmgr cluster show
 
     # check if writable (then we consider it as a 'master')
     READONLY=$(/usr/pgsql-9.6/bin/psql -qt -c "$WRITABLE_CHECK" 2>/dev/null)
-    if [ $? -ne 0 ]; then
+    if [ $? -ne 0 ] || [ "$CLUSTER" != "" ]; then
         return_fail;
     elif echo $READONLY | egrep -i "(f|false|off|0)" 2>/dev/null >/dev/null; then
         return_ok "master"
